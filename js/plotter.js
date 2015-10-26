@@ -12,6 +12,8 @@ define(['d3', 'jquery'], function(d3, $) {
   function Plotter(xLimits, yLimits) {
     this.xLimits = xLimits;
     this.yLimits = yLimits;
+
+    console.log(this.xLimits, this.yLimits);
   }
 
   Plotter.prototype.insertSVGframe = function() {
@@ -35,46 +37,65 @@ define(['d3', 'jquery'], function(d3, $) {
 
   Plotter.prototype.setAxes = function() {
 
-    var
-      width = $('svg').width(),
-      height = $('svg').height(),
-      xScale = d3.scale.linear().domain([this.xLimits[0], this.xLimits[1]]).range([0, width]),
-      yScale = d3.scale.linear().domain([this.yLimits[0], this.yLimits[1]]).range([height, 0]);
+    this.svgWidth = $('svg').width();
+    this.svgHeight = $('svg').height();
 
-    var xAxis = d3.svg.axis().scale(xScale).orient('bottom');
-    var yAxis = d3.svg.axis().scale(yScale).orient('left');
+    this.setScale('x');
+    this.setScale('y');
 
-    this.xAxis = this.frame
-      .append('g')
-      .attr('height', '21px')
-      .attr({
-        class: 'axis X',
-        transform: 'translate(0,' + (height / 2) + ')',
-        height: '21px'
-      })
-      .call(xAxis);
+    return this;
+  };
 
-    this.yAxis = this.frame
-      .append('g')
-      .attr('width', '21px')
-      .attr({
-        class: 'axis Y',
-        transform: 'translate(' + (width / 2) + ',0)',
-      })
-      .call(yAxis);
+  Plotter.prototype.setScale = function(axis) {
+    if (axis === 'x') {
+
+      $('.X').remove();
+
+      var
+        xScale = d3.scale.linear().domain([this.xLimits[0], this.xLimits[1]]).range([0, this.svgWidth]),
+        xAxis = d3.svg.axis().scale(xScale).orient('bottom');
+
+      this.frame
+        .append('g')
+        .attr({
+          class: 'axis X',
+          transform: 'translate(0,' + (this.svgHeight / 2) + ')',
+        })
+        .call(xAxis);
+    } else if (axis === 'y') {
+
+      $('.Y').remove();
+
+      var
+        yScale = d3.scale.linear().domain([this.yLimits[0], this.yLimits[1]]).range([this.svgHeight, 0]),
+        yAxis = d3.svg.axis().scale(yScale).orient('left');
+
+      this.frame
+        .append('g')
+        .attr({
+          class: 'axis Y',
+          transform: 'translate(' + (this.svgWidth / 2) + ',0)',
+        })
+        .call(yAxis);
+
+    } else {
+      console.error('no apropriate axis entry passed in to the function reScale');
+    }
 
     return this;
   };
 
   Plotter.prototype.setListeners = function(e) {
 
+    var start, distance;
 
     var
-      xSVGHeight = select('.X').node().getBBox().height,
-      xTopDistance = $('.X').offset().top-xSVGHeight,
+      xTopDistance = $('.X').offset().top,
       ySVGWidth = select('.Y').node().getBBox().width,
       yLeftDistance = $('.Y ').offset().left + ySVGWidth,
       abs = Math.abs,
+      plotter = this,
+      isMouseDown = false,
       mouseCloseTo = {
         x: false,
         y: false
@@ -82,29 +103,56 @@ define(['d3', 'jquery'], function(d3, $) {
 
     $(window).on({
       mousemove: function(e) {
-        var cursorAxisDistance = {
-          x: abs(e.clientY - xTopDistance),
-          y: abs(e.clientX - yLeftDistance)
-        };
+        var
+          mouseCloseAxis = mouseCloseTo.x || mouseCloseTo.y,
+          cursorAxisDistance = {
+            x: abs(e.pageY - xTopDistance),
+            y: abs(e.pageX - yLeftDistance)
+          };
         if (cursorAxisDistance.x < 6) {
           mouseCloseTo.x = true;
-          $('svg').css('cursor','ew-resize');
+          $('svg').css('cursor', 'ew-resize');
+          if (isMouseDown) {
+            if (!start) {
+              start = e.pageX;
+            } else {
+              distance = e.pageX - start;
+              console.log(plotter.xLimits, plotter.yLimits);
+              plotter.xLimits[0] -= distance / 2;
+              plotter.xLimits[1] += distance / 2;
+              plotter.setScale('x');
+            }
+          }
         } else if (cursorAxisDistance.y < 6) {
           mouseCloseTo.y = true;
-          $('svg').css('cursor','ns-resize');
-        } else{
-          if(mouseCloseTo.x || mouseCloseTo.y){
+          $('svg').css('cursor', 'ns-resize');
+          if (isMouseDown) {
+            if (!start) {
+              start = e.pageY;
+            } else {
+              distance = e.pageY - start;
+              plotter.yLimits[0] -= distance / 2;
+              plotter.yLimits[1] += distance / 2;
+              plotter.setScale('y');
+            }
+          }
+        } else {
+          if (mouseCloseAxis) {
             mouseCloseTo = {
               x: false,
               y: false
             };
-            $('svg').css('cursor','default');
+            $('svg').css('cursor', 'default');
           }
         }
 
       },
       mousedown: function(e) {
-
+        isMouseDown = true;
+      },
+      mouseup: function() {
+        isMouseDown = false;
+        start = null;
       }
     });
 
