@@ -22,6 +22,7 @@ require(['jquery', 'plotter'], function($, Plotter) {
   insertPlotter();
 
   $(window).resize(function() {
+    console.log('cau');
     clearTimeout(id);
     id = setTimeout(insertPlotter, 10);
   });

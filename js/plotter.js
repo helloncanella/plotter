@@ -10,23 +10,37 @@ define(['d3', 'jquery'], function(d3, $) {
     select = d3.select;
 
   function Plotter(xLimits, yLimits) {
-    this.xLimits = xLimits;
-    this.yLimits = yLimits;
+    this.xLimits = {
+      data: xLimits,
+    };
+
+    this.yLimits = {
+      data: yLimits,
+    };
   }
 
   Plotter.prototype.insertSVGframe = function() {
     $('svg').remove();
+    var plotter = this;
+
+    this.body = {
+      width: $('body').width(),
+      height: $('body').height()
+    };
+
+    this.xLimits.graphical = [0, this.body.width];
+    this.yLimits.graphical = [this.body.height, 0];
 
     var
       svg = d3.select('body').append('svg').attr({
-        'width': $('body').width(),
-        'height': $('body').height()
+        'width': plotter.body.width,
+        'height': plotter.body.height
       });
 
     this.frame = svg.append('g').attr({
       'transform': 'translate(' + padding / 2.5 + ',' + padding / 2.5 + ')',
-      'width': $('body').width(),
-      'height': $('body').height(),
+      'width': '100%',
+      'height': '100%',
       'class': 'frame'
     });
 
@@ -35,75 +49,75 @@ define(['d3', 'jquery'], function(d3, $) {
 
   Plotter.prototype.setAxes = function() {
 
-    this.svgWidth = $('svg').width();
-    this.svgHeight = $('svg').height();
-
-    this.setScale('x');
-    this.setScale('y');
+    var axes = this.setLimits();
+    var svgArray = this.buildSVG(axes);
+    this.setCenterPosition(svgArray);
 
     return this;
   };
 
-  Plotter.prototype.setScale = function(axis, distance) {
-    var scaled, xScaleFunction, yScaleFunction;
+  Plotter.prototype.setLimits = function(translation) {
+    var
+      scales = [],
+      svgAxes = [],
+      limits = [this.xLimits, this.yLimits],
+      axesLabel = ['X', 'Y'],
+      axesOrientation = ['bottom', 'left'];
 
-    if (axis === 'x') {
-
-      if (distance) {
-        xScaleFunction = scale(this.xLimits, [0, this.svgWidth]);
-        scaled = xScaleFunction(distance); //XXX Kludge.
-        this.xLimits[0] += scaled;
-        this.xLimits[1] -= scaled;
+    limits.forEach(function(limit, i) {
+      if (translation) {
+        var scaleFunction = scale(limit);
+        translation[i].forEach(function(distance, j) {
+          limit.data[j] += scaleFunction(distance);
+        });
       }
 
-      $('.X').remove();
+      $('.' + axesLabel[i]).remove();
 
-      var
-        xScale = scaleD3(this.xLimits, [0, this.svgWidth]),
-        xAxis = axisD3(xScale, 'bottom');
+      scales[i] = scaleD3(limit);
+      svgAxes[i] = axisD3(scales[i], axesOrientation[i]);
+    });
 
-      this.frame
-        .append('g')
-        .attr({
-          class: 'axis X',
-          transform: 'translate(0,' + (this.svgHeight / 2) + ')',
-        })
-        .call(xAxis);
-    } else if (axis === 'y') {
+    return svgAxes;
+  };
 
-      $('.Y').remove();
+  Plotter.prototype.buildSVG = function(axes) {
+    var
+      axesLabel = ['X', 'Y'],
+      svgArray = [],
+      frame = this.frame;
 
-      if (distance) {
-        yScaleFunction = scale(this.yLimits, [this.svgHeight, 0]);
-        scaled = yScaleFunction(distance);
-        this.yLimits[0] += scaled;
-        this.yLimits[1] -= scaled;
-      }
+    axes.forEach(function(axis, i) {
+      svgArray[i] = frame.append('g').attr('class', 'axis ' + axesLabel[i]).call(axis);
+    });
 
-      var
-        yScale = scaleD3(this.yLimits, [this.svgHeight, 0]),
-        yAxis = axisD3(yScale, 'left');
+    return svgArray;
+  };
 
-      console.log(this.frame
-        .append('g')
-        .attr({
-          class: 'axis Y',
-          transform: 'translate(' + (this.svgWidth / 2) + ',0)',
-        })
-        .call(yAxis));
+  Plotter.prototype.setCenterPosition = function(svgArray, center) {
 
-      console.log(this.frame
-        .append('g')
-        .attr({
-          class: 'axis Y',
-          transform: 'translate(' + (this.svgWidth / 2) + ',0)',
-        }));
+    var translation;
 
-    } else {
-      console.error('no apropriate axis entry passed in to the function reScale');
+    var axesLabel = ['X', 'Y'];
+
+    if (!center) {
+      center = [this.body.width/2, this.body.height/2];
     }
 
-    return this;
+    svgArray.forEach(function(svg, i) {
+      if (axesLabel[i] === 'X') {
+        translation = {
+          x: 0,
+          y: center[1]
+        };
+      } else if (axesLabel[i] === 'Y') {
+        translation = {
+          x: center[0],
+          y: 0
+        };
+      }
+      d3.select('.' + axesLabel[i]).attr('transform', 'translate(' + translation.x + ',' + translation.y + ')');
+    });
   };
 
   Plotter.prototype.setListeners = function() {
@@ -198,20 +212,21 @@ define(['d3', 'jquery'], function(d3, $) {
   };
 
   //Auxiliary functions
-  function scaleD3(dataLimits, graphicalLimits) {
-    if (dataLimits[0] > 0 && dataLimits[1] < 0) {
-      dataLimits = [dataLimits[0] * (-1), dataLimits[1] * (-1)];
+  function scaleD3(dataLimits) {
+    if (dataLimits.data[0] > 0 && dataLimits.data[1] < 0) {
+      dataLimits = [dataLimits.data[0] * (-1), dataLimits.data[1] * (-1)];
     }
-    return d3.scale.linear().domain([dataLimits[0], dataLimits[1]]).range([graphicalLimits[0], graphicalLimits[1]]);
+    return d3.scale.linear().domain([dataLimits.data[0], dataLimits.data[1]])
+      .range([dataLimits.graphical[0], dataLimits.graphical[1]]);
   }
 
   function axisD3(scaleD3, orientation) {
     return d3.svg.axis().scale(scaleD3).orient(orientation);
   }
 
-  function scale(dataLimits, graphicalLimits) {
+  function scale(dataLimits) {
     return function(distance) {
-      return (dataLimits[1] - dataLimits[0]) / (graphicalLimits[1] - graphicalLimits[0]) * distance * 8;
+      return (dataLimits.data[1] - dataLimits.data[0]) / (dataLimits.graphical[1] - dataLimits.graphical[0]) * distance * 8;
     };
   }
 
