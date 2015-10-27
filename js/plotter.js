@@ -46,14 +46,22 @@ define(['d3', 'jquery'], function(d3, $) {
     return this;
   };
 
-  Plotter.prototype.setScale = function(axis) {
-    if (axis === 'x') {
+  Plotter.prototype.setScale = function(axis, distance) {
+    var scaled, xScaleFunction, yScaleFunction;
 
+    if (axis === 'x') {
       $('.X').remove();
 
+      if (distance) {
+        xScaleFunction = scale(this.xLimits, [0, this.svgWidth]);
+        scaled = xScaleFunction(distance); //XXX Kludge.
+        this.xLimits[0] += scaled;
+        this.xLimits[1] -= scaled;
+      }
+
       var
-        xScale = d3.scale.linear().domain([this.xLimits[0], this.xLimits[1]]).range([0, this.svgWidth]),
-        xAxis = d3.svg.axis().scale(xScale).orient('bottom');
+        xScale = scaleD3(this.xLimits, [0, this.svgWidth]),
+        xAxis = axisD3(xScale,'bottom');
 
       this.frame
         .append('g')
@@ -66,9 +74,16 @@ define(['d3', 'jquery'], function(d3, $) {
 
       $('.Y').remove();
 
+      if (distance) {
+        yScaleFunction = scale(this.yLimits, [this.svgHeight, 0]);
+        scaled = yScaleFunction(distance);
+        this.yLimits[0] += scaled;
+        this.yLimits[1] -= scaled;
+      }
+
       var
-        yScale = d3.scale.linear().domain([this.yLimits[0], this.yLimits[1]]).range([this.svgHeight, 0]),
-        yAxis = d3.svg.axis().scale(yScale).orient('left');
+        yScale = scaleD3(this.yLimits, [this.svgHeight, 0]),
+        yAxis = axisD3(yScale,'left');
 
       this.frame
         .append('g')
@@ -80,6 +95,24 @@ define(['d3', 'jquery'], function(d3, $) {
 
     } else {
       console.error('no apropriate axis entry passed in to the function reScale');
+    }
+
+    //Auxiliary functions
+    function scaleD3(dataLimits, graphicalLimits) {
+      if(dataLimits[0]>0 && dataLimits[1]<0){
+        dataLimits = [dataLimits[0]*(-1),dataLimits[1]*(-1)];
+      }
+      return d3.scale.linear().domain([dataLimits[0], dataLimits[1]]).range([graphicalLimits[0], graphicalLimits[1]]);
+    }
+
+    function axisD3(scaleD3, orientation) {
+      return d3.svg.axis().scale(scaleD3).orient(orientation);
+    }
+
+    function scale(dataLimits, graphicalLimits) {
+      return function(distance) {
+        return (dataLimits[1] - dataLimits[0]) / (graphicalLimits[1] - graphicalLimits[0]) * distance * 8;
+      };
     }
 
     return this;
@@ -109,7 +142,7 @@ define(['d3', 'jquery'], function(d3, $) {
             x: abs(e.pageY - xTopDistance),
             y: abs(e.pageX - yLeftDistance)
           };
-        if (cursorAxisDistance.x < 6) {
+        if (cursorAxisDistance.x < 10  && mouseCloseTo.y === false) {
           mouseCloseTo.x = true;
           $('svg').css('cursor', 'ew-resize');
           if (isMouseDown) {
@@ -117,13 +150,11 @@ define(['d3', 'jquery'], function(d3, $) {
               start = e.pageX;
             } else {
               distance = e.pageX - start;
-              console.log(plotter.xLimits, plotter.yLimits);
-              plotter.xLimits[0] -= distance / 2;
-              plotter.xLimits[1] += distance / 2;
-              plotter.setScale('x');
+              plotter.setScale('x', distance);
+              start = e.pageX;
             }
           }
-        } else if (cursorAxisDistance.y < 6) {
+        } else if (cursorAxisDistance.y < 10 && mouseCloseTo.x === false) {
           mouseCloseTo.y = true;
           $('svg').css('cursor', 'ns-resize');
           if (isMouseDown) {
@@ -131,9 +162,8 @@ define(['d3', 'jquery'], function(d3, $) {
               start = e.pageY;
             } else {
               distance = e.pageY - start;
-              plotter.yLimits[0] -= distance / 2;
-              plotter.yLimits[1] += distance / 2;
-              plotter.setScale('y');
+              plotter.setScale('y', distance);
+              start = e.pageY;
             }
           }
         } else {

@@ -30,16 +30,28 @@
       opacity: 0.7;
     }
 
+    .axis .minor {
+      stroke: red;
+      stroke-width: 0.4px;
+    }
+
     .grid path {
       stroke-width: 0;
     }
 
-
+    .noselect {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
   </style>
 
 </head>
 
-<body>
+<body class='noselect'>
   <script src="http://localhost:4500/livereload.js" charset="utf-8"></script>
 </body>
 

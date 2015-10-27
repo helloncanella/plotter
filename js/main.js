@@ -5,8 +5,8 @@
 require(['jquery', 'plotter'], function($, Plotter) {
 
   var
-    xLimits = [-1000, 1000],
-    yLimits = [-15, 15];
+    xLimits = [-40, 40],
+    yLimits = [-1000, 1000];
 
   var plotter = new Plotter(xLimits, yLimits);
 
@@ -18,6 +18,7 @@ require(['jquery', 'plotter'], function($, Plotter) {
 
     $(window).resize(function() {
       insertPlotter();
+      console.log('aqui');
     });
 
   })();
